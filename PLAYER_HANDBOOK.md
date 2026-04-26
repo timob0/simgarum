@@ -101,6 +101,7 @@ Premium garum is no longer unlocked simply by waiting longer once. It depends on
 
 - Each batch receives a **quality score**.
 - Longer fermentation tends to raise quality, but ties up production capacity.
+- **Input freshness matters**: old fish and old salt reduce the quality ceiling of the final garum batch, with fish quality weighing more heavily than salt quality.
 - Producers gain **reputation** through repeated, consistent batches.
 - Merchants also gain **reputation** through consistently handling and selling quality stock.
 - Premium markets require both a minimum **quality level** and a minimum **merchant reputation**.
@@ -111,12 +112,17 @@ Current perishability and decay limits:
 
 | Good | Rule |
 |---|---|
-| **Fish** | starts at quality 10, loses 1.32 quality per tick, spoils at 0 |
-| **Salt** | starts at quality 12, loses 0.462 quality per tick, becomes unusable at 0 |
+| **Fish** | starts at quality 10, loses 1 quality per tick, spoils at 0 |
+| **Salt** | starts at quality 12, loses 0.35 quality per tick, becomes unusable at 0 |
 | **Standard garum** | perishes after 15 ticks |
 | **Premium garum** | perishes after 18 ticks |
 
 This means overproduction is dangerous for everyone in the chain. If fishers, salt-makers, producers, or merchants expand faster than sell-through allows, value is destroyed rather than safely stockpiled.
+
+In the current simulator, both producers and merchants are also increasingly **demand-aware**:
+
+- producers should not lean too hard into premium if the merchant channel is not mature enough to absorb it
+- merchants should avoid buying premium stock they cannot realistically move before it degrades or perishes
 
 ---
 
@@ -245,8 +251,8 @@ Expansion is no longer free once purchased. In the current prototype, each produ
 
 | Asset | Upkeep per Tick |
 |---|---:|
-| **Boat** | 1.0 gold |
-| **Salt pan** | 1.0 gold |
+| **Boat** | 0.5 gold |
+| **Salt pan** | 0.5 gold |
 | **Production slot** | 0.5 gold |
 | **Merchant ship** | 0.5 gold |
 
@@ -283,6 +289,8 @@ At this stage, the model already includes:
 - market-specific premium expectations
 - stock perishability
 - demand-aware merchant purchasing
+- input freshness effects from fish and salt into garum quality
+- a first multi-panel ncurses playtest frontend
 
 Features that may still evolve later include:
 
@@ -461,6 +469,8 @@ If players exit early, they are considered bankrupt for scoring purposes. The la
 
 > **Not implemented in the current simulator.** The Python prototype is currently a command-line simulation and balancing model, not a completed interactive map UI or terminal game surface. The interface material below describes a likely future presentation layer rather than current functionality.
 
+> **Current prototype note:** the actual Linux playtest client is currently an ncurses dashboard rather than the full map-driven interface described below. It already shows role-specific panels for assets, stock, markets, and recent events, but it is not yet the complete long-term interface.
+
 ### The Map
 
 The main screen is an **ASCII map of the Roman garum trade network**, displayed on your 3270 terminal. Locations are marked with symbols and connected by trade routes. Your current location is highlighted.
@@ -492,6 +502,8 @@ Select any location by typing its code (CART, CADIZ, OSTIA, etc.). You will see:
 - **Available resources** (what NPCs are selling)
 - **Your assets** at this location (inventory, facilities, ships)
 - **Active contracts** involving this location
+
+> **Current ncurses controls:** the current playtest UI already exposes early action scaffolding such as `s` (sell), `b` (buy), `i` (invest), `p` (pause/resume), `n` (next tick), `q` (quit), and `ESC` (close dialog). These are still first-pass controls and not yet the full command system described below.
 
 ### Commands
 
