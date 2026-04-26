@@ -9,11 +9,12 @@ from typing import Dict, List, Optional
 
 FISH_PRICE = 1.0
 SALT_PRICE = 0.5
-STANDARD_GARUM_PRICE = 10.0
+STANDARD_GARUM_PRICE = 12.0
 PREMIUM_GARUM_PRICE = 22.0
-MERCHANT_MARKUP = 0.25
-WHOLESALE_DISCOUNT = 0.88
-PREMIUM_WHOLESALE_DISCOUNT = 0.94
+LOCAL_STANDARD_DISCOUNT = 0.95
+MERCHANT_MARKUP = 0.18
+WHOLESALE_DISCOUNT = 0.92
+PREMIUM_WHOLESALE_DISCOUNT = 0.96
 
 STANDARD_RECIPE_FISH = 5
 STANDARD_RECIPE_SALT = 2
@@ -26,9 +27,9 @@ PREMIUM_PRODUCTION_TICKS = 6
 BOAT_COST = 60.0
 PAN_COST = 60.0
 PRODUCTION_SLOT_COST = 80.0
-MERCHANT_SHIP_COST = 100.0
+MERCHANT_SHIP_COST = 140.0
 
-STANDARD_SHIP_CAPACITY = 2
+STANDARD_SHIP_CAPACITY = 1
 PREMIUM_SHIP_CAPACITY = 1
 
 
@@ -175,14 +176,15 @@ class Simulation:
             ),
         ]
         self.markets: Dict[str, GarumMarket] = {
-            "Baelo": GarumMarket(location="Baelo", preferred_quality="standard", distance_from_baelo=0, standard_demand=2.0, premium_demand=1.0),
-            "Rome": GarumMarket(location="Rome", preferred_quality="premium", distance_from_baelo=3, standard_demand=5.0, premium_demand=6.0),
-            "Alexandria": GarumMarket(location="Alexandria", preferred_quality="standard", distance_from_baelo=4, standard_demand=6.0, premium_demand=3.0),
+            "Baelo": GarumMarket(location="Baelo", preferred_quality="standard", distance_from_baelo=0, standard_demand=3.0, premium_demand=1.0),
+            "Rome": GarumMarket(location="Rome", preferred_quality="premium", distance_from_baelo=3, standard_demand=4.0, premium_demand=5.0),
+            "Alexandria": GarumMarket(location="Alexandria", preferred_quality="standard", distance_from_baelo=4, standard_demand=7.0, premium_demand=2.0),
         }
         self.total_standard_completed = 0
         self.total_premium_completed = 0
         self.total_standard_sold = 0
         self.total_premium_sold = 0
+        self.total_standard_sold_local = 0
 
     def run(self, ticks: int = 12, verbose: bool = True) -> Dict[str, object]:
         for tick in range(1, ticks + 1):
@@ -194,6 +196,7 @@ class Simulation:
             self.produce_resources(verbose)
             self.producers_restock_inputs(verbose)
             self.advance_garum_production(verbose)
+            self.sell_local_standard_garum(verbose)
             self.merchants_buy_garum(verbose)
             self.advance_shipments(verbose)
             self.sell_surplus_raw_materials(verbose)
@@ -285,7 +288,7 @@ class Simulation:
 
         producer_market = self.markets[player.location]
         distant_market = self.markets["Rome"]
-        standard_revenue = producer_market.standard_price() * WHOLESALE_DISCOUNT
+        standard_revenue = producer_market.standard_price() * LOCAL_STANDARD_DISCOUNT
         premium_revenue = distant_market.premium_price() * PREMIUM_WHOLESALE_DISCOUNT
         standard_input_cost = STANDARD_RECIPE_FISH * FISH_PRICE + STANDARD_RECIPE_SALT * SALT_PRICE
         premium_input_cost = PREMIUM_RECIPE_FISH * FISH_PRICE + PREMIUM_RECIPE_SALT * SALT_PRICE
@@ -294,16 +297,37 @@ class Simulation:
 
         if player.inventory.gold < premium_input_cost and player.inventory.gold >= standard_input_cost:
             return "standard"
-        if premium_profit_per_tick > standard_profit_per_tick * 1.20:
+        if premium_profit_per_tick > standard_profit_per_tick * 1.50:
             return "premium"
-        if standard_profit_per_tick > premium_profit_per_tick * 1.20:
+        if standard_profit_per_tick > premium_profit_per_tick * 1.05:
             return "standard"
-        return self.rng.choices(["standard", "premium"], weights=[3, 2], k=1)[0]
+        return self.rng.choices(["standard", "premium"], weights=[5, 1], k=1)[0]
 
     def recipe_for_mode(self, mode: str) -> tuple[int, int, int]:
         if mode == "premium":
             return PREMIUM_RECIPE_FISH, PREMIUM_RECIPE_SALT, PREMIUM_PRODUCTION_TICKS
         return STANDARD_RECIPE_FISH, STANDARD_RECIPE_SALT, STANDARD_PRODUCTION_TICKS
+
+    def sell_local_standard_garum(self, verbose: bool) -> None:
+        producer = self.get_role_player("producer")
+        local_market = self.markets[producer.location]
+        if producer.inventory.standard_garum <= 0:
+            return
+
+        local_demand = max(0, int(round(self.rng.gauss(local_market.standard_demand + 2.0, 0.8))))
+        quantity = min(producer.inventory.standard_garum, local_demand)
+        if quantity <= 0:
+            return
+
+        sale_price = round(local_market.standard_price() * LOCAL_STANDARD_DISCOUNT, 2)
+        revenue = quantity * sale_price
+        producer.inventory.standard_garum -= quantity
+        producer.inventory.gold += revenue
+        local_market.standard_supply_sold_last_tick += quantity
+        self.total_standard_sold += quantity
+        self.total_standard_sold_local += quantity
+        if verbose:
+            print(f"{producer.name} sells {quantity} standard garum locally in {producer.location} for {revenue:.2f} gold")
 
     def merchants_buy_garum(self, verbose: bool) -> None:
         merchant = self.get_role_player("merchant")
@@ -312,43 +336,47 @@ class Simulation:
         available_capacity_standard = merchant.merchant_ships * STANDARD_SHIP_CAPACITY
         available_capacity_premium = merchant.merchant_ships * PREMIUM_SHIP_CAPACITY
 
-        if producer.inventory.standard_garum > 0 and available_capacity_standard > 0:
+        shipment_slots_left = max(0, merchant.merchant_ships - len(merchant.shipments))
+
+        if producer.inventory.standard_garum > 0 and available_capacity_standard > 0 and shipment_slots_left > 0:
             retail_price = producer_market.standard_price()
             wholesale_price = round(retail_price * WHOLESALE_DISCOUNT, 2)
-            quantity = min(producer.inventory.standard_garum, available_capacity_standard)
+            quantity = min(producer.inventory.standard_garum, available_capacity_standard, shipment_slots_left)
             affordable = min(quantity, int(merchant.inventory.gold // wholesale_price)) if wholesale_price > 0 else quantity
             if affordable > 0:
                 destination = self.choose_market_destination("standard")
                 distance = self.markets[destination].distance_from_baelo
-                transport_cost = affordable * distance * 0.5
+                transport_cost = affordable * distance * 1.5
                 total = affordable * wholesale_price + transport_cost
                 if merchant.inventory.gold >= total:
                     producer.inventory.standard_garum -= affordable
                     producer.inventory.gold += affordable * wholesale_price
                     merchant.inventory.gold -= total
                     merchant.shipments.append(
-                        Shipment("standard", affordable, distance, destination, transport_cost)
+                        Shipment("standard", affordable, distance + 1, destination, transport_cost)
                     )
+                    shipment_slots_left -= affordable
                     if verbose:
                         print(f"{merchant.name} buys {affordable} standard garum from {producer.name} for {affordable * wholesale_price:.2f} gold")
 
-        if producer.inventory.premium_garum > 0 and available_capacity_premium > 0:
+        if producer.inventory.premium_garum > 0 and available_capacity_premium > 0 and shipment_slots_left > 0:
             retail_price = producer_market.premium_price()
             wholesale_price = round(retail_price * PREMIUM_WHOLESALE_DISCOUNT, 2)
-            quantity = min(producer.inventory.premium_garum, available_capacity_premium)
+            quantity = min(producer.inventory.premium_garum, available_capacity_premium, shipment_slots_left)
             affordable = min(quantity, int(merchant.inventory.gold // wholesale_price)) if wholesale_price > 0 else quantity
             if affordable > 0:
                 destination = self.choose_market_destination("premium")
                 distance = self.markets[destination].distance_from_baelo
-                transport_cost = affordable * distance * 1.0
+                transport_cost = affordable * distance * 2.5
                 total = affordable * wholesale_price + transport_cost
                 if merchant.inventory.gold >= total:
                     producer.inventory.premium_garum -= affordable
                     producer.inventory.gold += affordable * wholesale_price
                     merchant.inventory.gold -= total
                     merchant.shipments.append(
-                        Shipment("premium", affordable, distance, destination, transport_cost)
+                        Shipment("premium", affordable, distance + 2, destination, transport_cost)
                     )
+                    shipment_slots_left -= affordable
                     if verbose:
                         print(f"{merchant.name} buys {affordable} premium garum from {producer.name} for {affordable * wholesale_price:.2f} gold")
 
@@ -371,11 +399,11 @@ class Simulation:
 
             market = self.markets[shipment.destination]
             if shipment.quality == "standard":
-                demand = max(0, int(round(self.rng.gauss(market.standard_demand, 1.0))))
+                demand = max(0, int(round(self.rng.gauss(market.standard_demand, 0.8))))
                 quantity_sold = min(shipment.quantity, demand)
                 sale_price = round(market.standard_price() * (1.0 + MERCHANT_MARKUP), 2)
                 spoilage = max(0, shipment.quantity - quantity_sold)
-                spoilage_cost = spoilage * 0.5
+                spoilage_cost = spoilage * 2.0
                 revenue = quantity_sold * sale_price
                 merchant.inventory.gold += revenue - spoilage_cost
                 market.standard_supply_sold_last_tick += quantity_sold
@@ -383,11 +411,11 @@ class Simulation:
                 if verbose:
                     print(f"{merchant.name} receives and sells {quantity_sold}/{shipment.quantity} standard garum in {shipment.destination} for {revenue:.2f} gold")
             else:
-                demand = max(0, int(round(self.rng.gauss(market.premium_demand, 1.0))))
+                demand = max(0, int(round(self.rng.gauss(market.premium_demand, 0.8))))
                 quantity_sold = min(shipment.quantity, demand)
                 sale_price = round(market.premium_price() * (1.0 + MERCHANT_MARKUP), 2)
                 spoilage = max(0, shipment.quantity - quantity_sold)
-                spoilage_cost = spoilage * 1.5
+                spoilage_cost = spoilage * 4.0
                 revenue = quantity_sold * sale_price
                 merchant.inventory.gold += revenue - spoilage_cost
                 market.premium_supply_sold_last_tick += quantity_sold
@@ -442,7 +470,7 @@ class Simulation:
     def merchants_invest(self, verbose: bool) -> None:
         merchant = self.get_role_player("merchant")
         in_transit = len(merchant.shipments)
-        if merchant.inventory.gold >= MERCHANT_SHIP_COST + 50 and in_transit >= merchant.merchant_ships:
+        if merchant.inventory.gold >= MERCHANT_SHIP_COST + 120 and in_transit >= merchant.merchant_ships:
             merchant.inventory.gold -= MERCHANT_SHIP_COST
             merchant.merchant_ships += 1
             if verbose:
@@ -465,6 +493,7 @@ class Simulation:
             "total_standard_completed": self.total_standard_completed,
             "total_premium_completed": self.total_premium_completed,
             "total_standard_sold": self.total_standard_sold,
+            "total_standard_sold_local": self.total_standard_sold_local,
             "total_premium_sold": self.total_premium_sold,
         }
 
@@ -523,6 +552,7 @@ def run_monte_carlo(runs: int, ticks: int, producer_mode: str, seed: Optional[in
     print(f"- avg standard done:   {mean(snapshot['total_standard_completed'] for snapshot in snapshots):.2f}")
     print(f"- avg premium done:    {mean(snapshot['total_premium_completed'] for snapshot in snapshots):.2f}")
     print(f"- avg standard sold:   {mean(snapshot['total_standard_sold'] for snapshot in snapshots):.2f}")
+    print(f"- avg standard local:  {mean(snapshot['total_standard_sold_local'] for snapshot in snapshots):.2f}")
     print(f"- avg premium sold:    {mean(snapshot['total_premium_sold'] for snapshot in snapshots):.2f}")
     print(f"- avg shipments live:  {mean(snapshot['shipments_in_transit'] for snapshot in snapshots):.2f}")
 

@@ -12,6 +12,7 @@ This version implements:
 - dynamic market demand and pricing for garum
 - location-specific garum demand by quality
 - merchant shipping delays and distance-based shipping costs
+- a local outlet for standard garum near production centers
 - capital expansion for every role
 
 ## Roles
@@ -29,10 +30,10 @@ This version implements:
 
 ## Garum base values
 
-- Standard garum: 10.0 gold
+- Standard garum: 12.0 gold
 - Premium garum: 22.0 gold
-- Merchant resale markup: 25%
-- Merchant wholesale discount from venue price: 12% for standard, 6% for premium
+- Merchant resale markup: 18%
+- Merchant wholesale discount from venue price: 8% for standard, 4% for premium
 
 ## Production rules per tick
 
@@ -40,6 +41,7 @@ This version implements:
 - Salt-maker: 10 salt per pan
 - Producer:
   - starts with 2 production slots
+  - standard garum can be sold locally near production centers
   - standard garum takes 3 ticks and consumes 5 fish + 2 salt per amphora
   - premium garum takes 6 ticks and consumes 4 fish + 2 salt per amphora
 - Merchant:
@@ -60,7 +62,7 @@ This version implements:
 - New fishing boat: 60 gold
 - New salt pan: 60 gold
 - New production slot: 80 gold
-- New merchant ship: 100 gold
+- New merchant ship: 140 gold
 
 ## Running
 
