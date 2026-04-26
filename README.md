@@ -91,19 +91,54 @@ The script prints a per-tick summary and a final state dump.
 
 ## Linux ncurses playtest UI
 
-A first observational ncurses client is available on Linux:
+A structured ncurses client is available on Linux:
 
 ```bash
 python3 -m simgarum.ncurses_ui --tick-seconds 0.5
 ```
 
-Current status:
+### Layout
 
-- lets a human choose one of the four roles, or use `--random-role`
-- runs the same engine as the CLI simulation
-- shows live market and role state
-- supports pause/resume and manual stepping
-- this first version is observational, not yet a full command-driven gameplay client
+The screen is split into five panels:
+
+1. **Header** – role, tick number, running/paused state, tick delay.
+2. **Assets** (left) – productive assets (boats, pans, slots, ships)
+   with their per-tick upkeep costs and, where relevant, production
+   progress bars or active shipment list.
+3. **Stock** (center) – current inventory broken down by quality band
+   (high/mid/low) with quality bars and age information for raw
+   materials, and per-batch quality+age for garum.
+4. **Market** (right) – local venue prices plus all distant markets
+   with per-market shipping time, shipping cost, demand, and premium
+   quality/reputation requirements.
+5. **Events** (bottom) – scrolling event log with colour-coded entries
+   (green = gains, yellow = losses).
+
+### Controls
+
+| Key       | Action                                                    |
+| `j`/`↓`   | Move down in role chooser                                 |
+| `k`/`↑`   | Move up in role chooser                                   |
+| `r`       | Random role in role chooser                               |
+| `Enter`   | Confirm role selection                                    |
+| `SPACE`   | Step one tick (when paused)                               |
+| `n`       | Step one tick (when running)                              |
+| `p`       | Pause / resume                                            |
+| `s`       | Open sell dialog (placeholder)                            |
+| `b`       | Open buy dialog (placeholder)                             |
+| `i`       | Open invest dialog (placeholder)                          |
+| `ESC`     | Close placeholder dialog                                  |
+| `q`       | Quit                                                      |
+
+### Current status
+
+- Structured panel layout with role-specific colour themes
+- Stock broken down by quality bands and age
+- Separate asset panel with upkeep costs and production/shipment details
+- Market panel with distant-market shipping info and premium requirements
+- Action keys scaffolded (sell/buy/invest show placeholder dialogs)
+- Runs the same engine as the CLI simulation
+- Supports pause/resume, manual stepping, and random role selection
 
 ## Monte Carlo balance checks
 
