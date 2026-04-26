@@ -54,3 +54,18 @@ python3 sim_garum.py
 ```
 
 The script prints a per-tick summary and a final state dump.
+
+## Monte Carlo balance checks
+
+Run many simulated games to inspect whether the economy stays plausible:
+
+```bash
+python3 sim_garum.py --runs 100 --ticks 60
+```
+
+Useful options:
+
+- `--producer-mode standard`
+- `--producer-mode premium`
+- `--producer-mode weighted`
+- `--seed 42`
