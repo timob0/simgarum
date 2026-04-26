@@ -25,6 +25,8 @@ STANDARD_PRODUCTION_TICKS = 3
 PREMIUM_PRODUCTION_TICKS = 6
 FISH_START_QUALITY = 10.0
 FISH_DECAY_PER_TICK = 1.0
+SALT_START_QUALITY = 12.0
+SALT_DECAY_PER_TICK = 0.35
 PREMIUM_MIN_QUALITY = 84.0
 PREMIUM_REPUTATION_THRESHOLD = 72.0
 MERCHANT_PREMIUM_REPUTATION_THRESHOLD = 35.0
@@ -57,6 +59,12 @@ class Inventory:
 @dataclass
 class FishUnit:
     quality: float = FISH_START_QUALITY
+    age: int = 0
+
+
+@dataclass
+class SaltUnit:
+    quality: float = SALT_START_QUALITY
     age: int = 0
 
 
@@ -97,6 +105,7 @@ class Player:
     merchant_ships: int = 0
     shipments: List[Shipment] = field(default_factory=list)
     fish_stock: List[FishUnit] = field(default_factory=list)
+    salt_stock: List[SaltUnit] = field(default_factory=list)
     producer_batches: List[GarumBatch] = field(default_factory=list)
     merchant_batches: List[GarumBatch] = field(default_factory=list)
     producer_reputation: float = 0.0
@@ -152,6 +161,7 @@ class WorldMarket:
         cost = affordable * SALT_PRICE
         buyer.inventory.gold -= cost
         buyer.inventory.salt += affordable
+        buyer.salt_stock.extend(SaltUnit() for _ in range(affordable))
         return affordable
 
     def provide_amphorae(self, buyer: Player, quantity: int) -> None:
@@ -170,8 +180,11 @@ class WorldMarket:
 
     def sell_salt(self, seller: Player, quantity: int) -> float:
         demand = max(0, int(round(self.rng.gauss(8.0 + seller.inventory.pans, 2.0))))
-        quantity = min(quantity, seller.inventory.salt, demand)
+        quantity = min(quantity, seller.inventory.salt, demand, len(seller.salt_stock))
         revenue = quantity * SALT_PRICE
+        seller.salt_stock.sort(key=lambda s: s.quality)
+        if quantity > 0:
+            seller.salt_stock = seller.salt_stock[quantity:]
         seller.inventory.salt -= quantity
         seller.inventory.gold += revenue
         return revenue
@@ -309,21 +322,38 @@ class Simulation:
             remaining.append(fish)
         player.fish_stock = remaining
 
+    def age_salt_stock(self, player: Player, verbose: bool) -> None:
+        remaining: List[SaltUnit] = []
+        for salt in player.salt_stock:
+            salt.age += 1
+            salt.quality -= SALT_DECAY_PER_TICK
+            if salt.quality <= 0:
+                if player.inventory.salt > 0:
+                    player.inventory.salt -= 1
+                self.log_event(f"{player.name} loses 1 salt to degradation", verbose)
+                continue
+            remaining.append(salt)
+        player.salt_stock = remaining
+
     def pay_upkeep(self, verbose: bool) -> None:
         for player in self.players:
             upkeep = 0.0
             upkeep += player.inventory.boats * FACILITY_UPKEEP_PER_TICK
             upkeep += player.inventory.pans * FACILITY_UPKEEP_PER_TICK
             upkeep += len(player.producer_slots or []) * FACILITY_UPKEEP_PER_TICK
+            upkeep += player.merchant_ships * FACILITY_UPKEEP_PER_TICK
             if upkeep > 0:
                 player.inventory.gold = max(0.0, player.inventory.gold - upkeep)
                 self.log_event(f"{player.name} pays {upkeep:.2f} gold upkeep", verbose)
 
     def age_inventory(self, verbose: bool) -> None:
         fisherman = self.get_role_player("fisherman")
+        salt_maker = self.get_role_player("salt-maker")
         producer = self.get_role_player("producer")
         merchant = self.get_role_player("merchant")
         self.age_fish_stock(fisherman, verbose)
+        self.age_salt_stock(salt_maker, verbose)
+        self.age_salt_stock(producer, verbose)
         producer.producer_batches = self.age_batches(producer.producer_batches, verbose, producer.name)
         merchant.merchant_batches = self.age_batches(merchant.merchant_batches, verbose, merchant.name)
 
@@ -346,6 +376,13 @@ class Simulation:
             player.fish_stock = player.fish_stock[consumed:]
             player.inventory.fish = max(0, player.inventory.fish - consumed)
 
+    def consume_salt(self, player: Player, quantity: int) -> None:
+        player.salt_stock.sort(key=lambda s: s.quality)
+        consumed = min(quantity, len(player.salt_stock))
+        if consumed > 0:
+            player.salt_stock = player.salt_stock[consumed:]
+            player.inventory.salt = max(0, player.inventory.salt - consumed)
+
     def produce_resources(self, verbose: bool) -> None:
         for player in self.players:
             if player.role == "fisherman":
@@ -356,6 +393,7 @@ class Simulation:
             elif player.role == "salt-maker":
                 produced = 10 * player.inventory.pans
                 player.inventory.salt += produced
+                player.salt_stock.extend(SaltUnit() for _ in range(produced))
                 self.log_event(f"{player.name} harvests {produced} salt", verbose)
 
     def producers_restock_inputs(self, verbose: bool) -> None:
@@ -390,7 +428,7 @@ class Simulation:
                     needed_fish, needed_salt, _ = self.recipe_for_mode(slot.mode)
                     if player.inventory.fish >= needed_fish and player.inventory.salt >= needed_salt and player.inventory.empty_amphorae >= 1:
                         self.consume_fish(player, needed_fish)
-                        player.inventory.salt -= needed_salt
+                        self.consume_salt(player, needed_salt)
                         player.inventory.empty_amphorae -= 1
                         slot.progress = 1
                         self.log_event(f"{player.name} starts {slot.mode} garum production in slot {index}", verbose)
