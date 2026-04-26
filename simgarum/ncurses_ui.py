@@ -5,6 +5,12 @@ import curses
 import time
 from typing import List
 
+
+COLOR_DEFAULT = 1
+COLOR_GOOD = 2
+COLOR_WARN = 3
+COLOR_NOTE = 4
+
 from .engine import Simulation
 
 
@@ -36,6 +42,21 @@ def choose_role(stdscr, random_enabled: bool = False) -> str:
             return random.choice(ROLE_ORDER)
 
 
+def fmt_delta(value: float) -> str:
+    if value > 0:
+        return f"+{value}"
+    return str(value)
+
+
+def event_color(event: str) -> int:
+    low = event.lower()
+    if any(word in low for word in ["sells", "buys a new", "adds a new", "completes"]):
+        return COLOR_GOOD
+    if any(word in low for word in ["spoilage", "loses", "downgrades"]):
+        return COLOR_WARN
+    return COLOR_NOTE
+
+
 def render(stdscr, sim: Simulation, role: str, tick: int, paused: bool, tick_seconds: float) -> None:
     stdscr.erase()
     h, w = stdscr.getmaxyx()
@@ -43,15 +64,21 @@ def render(stdscr, sim: Simulation, role: str, tick: int, paused: bool, tick_sec
     merchant = sim.get_role_player("merchant")
     producer = sim.get_role_player("producer")
 
+    deltas = sim.last_tick_deltas
+    fdelta = deltas.get('fisherman', {})
+    sdelta = deltas.get('salt-maker', {})
+    pdelta = deltas.get('producer', {})
+    mdelta = deltas.get('merchant', {})
+
     lines: List[str] = [
         f"SimGarum ncurses playtest", 
         f"Tick: {tick}    Role: {role}    Tick delay: {tick_seconds:.2f}s    {'PAUSED' if paused else 'RUNNING'}",
         "",
         f"You: gold={player.inventory.gold:.2f} fish={player.inventory.fish} salt={player.inventory.salt} boats={player.inventory.boats} pans={player.inventory.pans}",
-        f"Fisherman: gold={sim.get_role_player('fisherman').inventory.gold:.2f} fish={sim.get_role_player('fisherman').inventory.fish} boats={sim.get_role_player('fisherman').inventory.boats}",
-        f"Salt-maker: gold={sim.get_role_player('salt-maker').inventory.gold:.2f} salt={sim.get_role_player('salt-maker').inventory.salt} pans={sim.get_role_player('salt-maker').inventory.pans}",
-        f"Producer rep={producer.producer_reputation:.1f} batches={len(producer.producer_batches)} slots={len(producer.producer_slots or [])}",
-        f"Merchant rep={merchant.merchant_reputation:.1f} ships={merchant.merchant_ships} in_transit={len(merchant.shipments)}",
+        f"Fisherman: gold={sim.get_role_player('fisherman').inventory.gold:.2f} ({fmt_delta(fdelta.get('gold', 0))})  fish={sim.get_role_player('fisherman').inventory.fish} ({fmt_delta(fdelta.get('fish', 0))})  boats={sim.get_role_player('fisherman').inventory.boats}",
+        f"Salt-maker: gold={sim.get_role_player('salt-maker').inventory.gold:.2f} ({fmt_delta(sdelta.get('gold', 0))})  salt={sim.get_role_player('salt-maker').inventory.salt} ({fmt_delta(sdelta.get('salt', 0))})  pans={sim.get_role_player('salt-maker').inventory.pans}",
+        f"Producer: gold={producer.inventory.gold:.2f} ({fmt_delta(pdelta.get('gold', 0))}) rep={producer.producer_reputation:.1f} batches={len(producer.producer_batches)} ({fmt_delta(pdelta.get('producer_batches', 0))}) slots={len(producer.producer_slots or [])}",
+        f"Merchant: gold={merchant.inventory.gold:.2f} ({fmt_delta(mdelta.get('gold', 0))}) rep={merchant.merchant_reputation:.1f} ships={merchant.merchant_ships} transit={len(merchant.shipments)} ({fmt_delta(mdelta.get('shipments', 0))})",
         "",
         "Markets:",
     ]
@@ -76,8 +103,24 @@ def render(stdscr, sim: Simulation, role: str, tick: int, paused: bool, tick_sec
         "Interactive actions per role are the next layer.",
     ]
 
-    for i, line in enumerate(lines[: h - 1]):
-        stdscr.addstr(i, 0, line[: max(1, w - 1)])
+    row = 0
+    for line in lines[: h - 14]:
+        stdscr.addstr(row, 0, line[: max(1, w - 1)], curses.color_pair(COLOR_DEFAULT))
+        row += 1
+
+    if row < h - 1:
+        stdscr.addstr(row, 0, "", curses.color_pair(COLOR_DEFAULT))
+        row += 1
+    if row < h - 1:
+        stdscr.addstr(row, 0, "Recent tick events:", curses.A_BOLD | curses.color_pair(COLOR_DEFAULT))
+        row += 1
+
+    for event in sim.recent_events[-min(10, max(1, h - row - 2)):]:
+        if row >= h - 1:
+            break
+        stdscr.addstr(row, 0, f"  - {event}"[: max(1, w - 1)], curses.color_pair(event_color(event)))
+        row += 1
+
     stdscr.refresh()
 
 
@@ -85,6 +128,12 @@ def run_ui(stdscr, ticks: int, tick_seconds: float, seed: int | None, producer_m
     curses.curs_set(0)
     stdscr.nodelay(True)
     stdscr.keypad(True)
+    curses.start_color()
+    curses.use_default_colors()
+    curses.init_pair(COLOR_DEFAULT, curses.COLOR_WHITE, -1)
+    curses.init_pair(COLOR_GOOD, curses.COLOR_GREEN, -1)
+    curses.init_pair(COLOR_WARN, curses.COLOR_YELLOW, -1)
+    curses.init_pair(COLOR_NOTE, curses.COLOR_CYAN, -1)
 
     role = choose_role(stdscr, random_enabled=random_role)
     sim = Simulation(seed=seed, producer_mode=producer_mode, tick_duration_seconds=0.0)

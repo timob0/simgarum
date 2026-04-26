@@ -210,6 +210,7 @@ class Simulation:
         self.total_standard_sold_local = 0
         self.total_batches_perished = 0
         self.recent_events: List[str] = []
+        self.last_tick_deltas: Dict[str, Dict[str, float]] = {}
 
     def log_event(self, message: str, verbose: bool = False) -> None:
         self.recent_events.append(message)
@@ -217,7 +218,25 @@ class Simulation:
         if verbose:
             print(message)
 
+    def snapshot_role_metrics(self) -> Dict[str, Dict[str, float]]:
+        snap: Dict[str, Dict[str, float]] = {}
+        for player in self.players:
+            inv = player.inventory
+            snap[player.role] = {
+                'gold': inv.gold,
+                'fish': inv.fish,
+                'salt': inv.salt,
+                'boats': inv.boats,
+                'pans': inv.pans,
+                'producer_slots': len(player.producer_slots or []),
+                'merchant_ships': player.merchant_ships,
+                'producer_batches': len(player.producer_batches),
+                'shipments': len(player.shipments),
+            }
+        return snap
+
     def step(self, tick: int, verbose: bool = True) -> None:
+        before = self.snapshot_role_metrics()
         self.recent_events = []
         for market in self.markets.values():
             market.reset_tick_sales()
@@ -233,6 +252,15 @@ class Simulation:
         self.merchants_invest(verbose)
         self.producers_invest(verbose)
         self.raw_producers_invest(verbose)
+
+        after = self.snapshot_role_metrics()
+        self.last_tick_deltas = {}
+        for role, after_metrics in after.items():
+            before_metrics = before.get(role, {})
+            self.last_tick_deltas[role] = {
+                key: round(after_metrics[key] - before_metrics.get(key, 0.0), 2)
+                for key in after_metrics
+            }
 
         if verbose:
             self.print_market_snapshot()
