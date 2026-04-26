@@ -245,8 +245,8 @@ Expansion is no longer free once purchased. In the current prototype, each produ
 
 | Asset | Upkeep per Tick |
 |---|---:|
-| **Boat** | 0.5 gold |
-| **Salt pan** | 0.5 gold |
+| **Boat** | 1.0 gold |
+| **Salt pan** | 1.0 gold |
 | **Production slot** | 0.5 gold |
 | **Merchant ship** | 0.5 gold |
 

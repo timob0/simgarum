@@ -38,7 +38,10 @@ BOAT_COST = 60.0
 PAN_COST = 60.0
 PRODUCTION_SLOT_COST = 80.0
 MERCHANT_SHIP_COST = 140.0
-FACILITY_UPKEEP_PER_TICK = 0.5
+BOAT_UPKEEP_PER_TICK = 1.0
+PAN_UPKEEP_PER_TICK = 1.0
+PRODUCTION_SLOT_UPKEEP_PER_TICK = 0.5
+MERCHANT_SHIP_UPKEEP_PER_TICK = 0.5
 
 STANDARD_SHIP_CAPACITY = 1
 PREMIUM_SHIP_CAPACITY = 1
@@ -341,10 +344,10 @@ class Simulation:
     def pay_upkeep(self, verbose: bool) -> None:
         for player in self.players:
             upkeep = 0.0
-            upkeep += player.inventory.boats * FACILITY_UPKEEP_PER_TICK
-            upkeep += player.inventory.pans * FACILITY_UPKEEP_PER_TICK
-            upkeep += len(player.producer_slots or []) * FACILITY_UPKEEP_PER_TICK
-            upkeep += player.merchant_ships * FACILITY_UPKEEP_PER_TICK
+            upkeep += player.inventory.boats * BOAT_UPKEEP_PER_TICK
+            upkeep += player.inventory.pans * PAN_UPKEEP_PER_TICK
+            upkeep += len(player.producer_slots or []) * PRODUCTION_SLOT_UPKEEP_PER_TICK
+            upkeep += player.merchant_ships * MERCHANT_SHIP_UPKEEP_PER_TICK
             if upkeep > 0:
                 player.inventory.gold = max(0.0, player.inventory.gold - upkeep)
                 self.log_event(f"{player.name} pays {upkeep:.2f} gold upkeep", verbose)
