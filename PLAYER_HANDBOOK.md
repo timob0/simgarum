@@ -111,8 +111,8 @@ Current perishability and decay limits:
 
 | Good | Rule |
 |---|---|
-| **Fish** | starts at quality 10, loses 1 quality per tick, spoils at 0 |
-| **Salt** | starts at quality 12, loses 0.35 quality per tick, becomes unusable at 0 |
+| **Fish** | starts at quality 10, loses 1.1 quality per tick, spoils at 0 |
+| **Salt** | starts at quality 12, loses 0.385 quality per tick, becomes unusable at 0 |
 | **Standard garum** | perishes after 15 ticks |
 | **Premium garum** | perishes after 18 ticks |
 
