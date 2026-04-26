@@ -75,11 +75,35 @@ This version implements:
 
 ## Running
 
+CLI simulation:
+
 ```bash
 python3 sim_garum.py
 ```
 
+Optional real-time tick delay:
+
+```bash
+python3 sim_garum.py --tick-seconds 0.5
+```
+
 The script prints a per-tick summary and a final state dump.
+
+## Linux ncurses playtest UI
+
+A first observational ncurses client is available on Linux:
+
+```bash
+python3 -m simgarum.ncurses_ui --tick-seconds 0.5
+```
+
+Current status:
+
+- lets a human choose one of the four roles, or use `--random-role`
+- runs the same engine as the CLI simulation
+- shows live market and role state
+- supports pause/resume and manual stepping
+- this first version is observational, not yet a full command-driven gameplay client
 
 ## Monte Carlo balance checks
 
