@@ -13,6 +13,8 @@ This version implements:
 - location-specific garum demand by quality
 - merchant shipping delays and distance-based shipping costs
 - a local outlet for standard garum near production centers
+- batch quality, reputation, and perishability mechanics for garum
+- location-specific premium quality and reputation requirements
 - capital expansion for every role
 
 ## Roles
@@ -44,6 +46,13 @@ This version implements:
   - standard garum can be sold locally near production centers
   - standard garum takes 3 ticks and consumes 5 fish + 2 salt per amphora
   - premium garum takes 6 ticks and consumes 4 fish + 2 salt per amphora
+  - longer, more consistent fermentation increases quality and producer reputation
+- Merchant:
+  - reputation can be earned through consistent standard and premium trade
+  - premium trade depends on market-specific quality and reputation requirements
+  - softer premium markets can accept trial premium sales before full reputation unlock
+  - premium batches can be downgraded if quality or reputation is insufficient
+  - garum can spoil if held or shipped too long, currently after 15 ticks for standard and 18 ticks for premium
 - Merchant:
   - starts with 1 ship
   - shipping takes time based on distance to market
