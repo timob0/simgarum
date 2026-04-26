@@ -63,6 +63,13 @@ The current model uses fixed gold anchor prices for the main inputs:
 
 These prices are intentionally stable so that the first balancing work can focus on garum production, quality, reputation, and trade rather than on raw-material price volatility.
 
+However, raw materials are **not** perfectly stable in storage:
+
+- fish quality decays quickly and fish eventually spoils
+- salt quality decays more slowly, but old salt eventually becomes unusable too
+
+So even with fixed anchor prices, stockpiling raw inputs is risky.
+
 ### Garum Value Channels
 
 Garum is where most market dynamics happen.
@@ -100,12 +107,14 @@ Premium garum is no longer unlocked simply by waiting longer once. It depends on
 - Softer markets may accept **trial premium sales** before full reputation unlock.
 - Garum can **perish** while held by producers or merchants.
 
-Current perishability limits:
+Current perishability and decay limits:
 
-| Garum Type | Perishes After |
-|---|---:|
-| **Standard** | 15 ticks |
-| **Premium** | 18 ticks |
+| Good | Rule |
+|---|---|
+| **Fish** | starts at quality 10, loses 1 quality per tick, spoils at 0 |
+| **Salt** | starts at quality 12, loses 0.35 quality per tick, becomes unusable at 0 |
+| **Standard garum** | perishes after 15 ticks |
+| **Premium garum** | perishes after 18 ticks |
 
 This means overproduction is dangerous for everyone in the chain. If fishers, salt-makers, producers, or merchants expand faster than sell-through allows, value is destroyed rather than safely stockpiled.
 
@@ -229,6 +238,19 @@ The current prototype uses explicit expansion thresholds:
 | **Merchant** | +1 ship | 140 gold | expands at 260 gold |
 
 The thresholds are higher than the purchase prices because each role is expected to keep a safety buffer rather than expanding the instant it can barely afford to do so.
+
+### Ongoing Operating Costs
+
+Expansion is no longer free once purchased. In the current prototype, each productive asset has a per-tick upkeep cost:
+
+| Asset | Upkeep per Tick |
+|---|---:|
+| **Boat** | 0.5 gold |
+| **Salt pan** | 0.5 gold |
+| **Production slot** | 0.5 gold |
+| **Merchant ship** | 0.5 gold |
+
+This upkeep is an important balancing mechanism. It prevents all four roles from expanding blindly without regard to whether their extra capacity can actually be used profitably.
 
 ### What Each Role Is Really Managing
 
