@@ -73,6 +73,7 @@ class ProducerSlot:
     mode: str = "standard"
     progress: int = 0
     target_duration: int = 0
+    input_quality: float = 0.0
 
 
 @dataclass
@@ -369,19 +370,25 @@ class Simulation:
             remaining.append(batch)
         return remaining
 
-    def consume_fish(self, player: Player, quantity: int) -> None:
+    def consume_fish(self, player: Player, quantity: int) -> float:
         player.fish_stock.sort(key=lambda f: f.quality)
-        consumed = min(quantity, len(player.fish_stock))
+        consumed_units = player.fish_stock[: min(quantity, len(player.fish_stock))]
+        consumed = len(consumed_units)
+        avg_quality = sum(f.quality for f in consumed_units) / consumed if consumed > 0 else 0.0
         if consumed > 0:
             player.fish_stock = player.fish_stock[consumed:]
             player.inventory.fish = max(0, player.inventory.fish - consumed)
+        return avg_quality
 
-    def consume_salt(self, player: Player, quantity: int) -> None:
+    def consume_salt(self, player: Player, quantity: int) -> float:
         player.salt_stock.sort(key=lambda s: s.quality)
-        consumed = min(quantity, len(player.salt_stock))
+        consumed_units = player.salt_stock[: min(quantity, len(player.salt_stock))]
+        consumed = len(consumed_units)
+        avg_quality = sum(s.quality for s in consumed_units) / consumed if consumed > 0 else 0.0
         if consumed > 0:
             player.salt_stock = player.salt_stock[consumed:]
             player.inventory.salt = max(0, player.inventory.salt - consumed)
+        return avg_quality
 
     def produce_resources(self, verbose: bool) -> None:
         for player in self.players:
@@ -427,8 +434,9 @@ class Simulation:
                     slot.target_duration = duration + self.extra_fermentation_ticks(slot.mode, player)
                     needed_fish, needed_salt, _ = self.recipe_for_mode(slot.mode)
                     if player.inventory.fish >= needed_fish and player.inventory.salt >= needed_salt and player.inventory.empty_amphorae >= 1:
-                        self.consume_fish(player, needed_fish)
-                        self.consume_salt(player, needed_salt)
+                        fish_quality = self.consume_fish(player, needed_fish)
+                        salt_quality = self.consume_salt(player, needed_salt)
+                        slot.input_quality = fish_quality * 0.70 + salt_quality * 0.30
                         player.inventory.empty_amphorae -= 1
                         slot.progress = 1
                         self.log_event(f"{player.name} starts {slot.mode} garum production in slot {index}", verbose)
@@ -436,7 +444,7 @@ class Simulation:
 
                 slot.progress += 1
                 if slot.progress >= max(1, slot.target_duration):
-                    batch = self.create_batch(slot.mode, slot.progress)
+                    batch = self.create_batch(slot.mode, slot.progress, slot.input_quality)
                     player.producer_batches.append(batch)
                     if batch.quality_label == "standard":
                         self.total_standard_completed += 1
@@ -445,6 +453,7 @@ class Simulation:
                     self.update_producer_reputation(player, batch)
                     slot.progress = 0
                     slot.target_duration = 0
+                    slot.input_quality = 0.0
                     player.inventory.empty_amphorae += 1
                     self.log_event(f"{player.name} completes 1 batch of {batch.quality_label} garum in slot {index} (quality {batch.quality_score:.1f})", verbose)
 
@@ -455,11 +464,14 @@ class Simulation:
             return 2 if player.producer_reputation < PREMIUM_REPUTATION_THRESHOLD else 3
         return 0
 
-    def create_batch(self, mode: str, actual_ticks: int) -> GarumBatch:
+    def create_batch(self, mode: str, actual_ticks: int, input_quality: float) -> GarumBatch:
         base_ticks = PREMIUM_PRODUCTION_TICKS if mode == "premium" else STANDARD_PRODUCTION_TICKS
         extra = max(0, actual_ticks - base_ticks)
-        base_quality = 60 if mode == "standard" else 74
-        quality = base_quality + extra * 6 + self.rng.uniform(-2.5, 2.5)
+        fermentation_base = 60 if mode == "standard" else 72
+        fermentation_quality = fermentation_base + extra * 5.5
+        input_component = input_quality * 2.0
+        low_input_penalty = max(0.0, (7.0 - input_quality) * 2.0)
+        quality = fermentation_quality + input_component - low_input_penalty + self.rng.uniform(-2.0, 2.0)
         label = "premium" if quality >= PREMIUM_MIN_QUALITY else "standard"
         return GarumBatch(quality_label=label, quality_score=round(quality, 2))
 
