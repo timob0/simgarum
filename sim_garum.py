@@ -11,12 +11,13 @@ FISH_PRICE = 1.0
 SALT_PRICE = 0.5
 STANDARD_GARUM_PRICE = 10.0
 PREMIUM_GARUM_PRICE = 22.0
-MERCHANT_MARKUP = 0.20
-WHOLESALE_DISCOUNT = 0.82
+MERCHANT_MARKUP = 0.25
+WHOLESALE_DISCOUNT = 0.88
+PREMIUM_WHOLESALE_DISCOUNT = 0.94
 
 STANDARD_RECIPE_FISH = 5
 STANDARD_RECIPE_SALT = 2
-PREMIUM_RECIPE_FISH = 5
+PREMIUM_RECIPE_FISH = 4
 PREMIUM_RECIPE_SALT = 2
 
 STANDARD_PRODUCTION_TICKS = 3
@@ -36,6 +37,12 @@ class Inventory:
 
 
 @dataclass
+class ProducerSlot:
+    mode: str = "standard"
+    progress: int = 0
+
+
+@dataclass
 class Player:
     name: str
     role: str
@@ -45,6 +52,7 @@ class Player:
     production_progress: int = 0
     merchant_stock_standard: int = 0
     merchant_stock_premium: int = 0
+    producer_slots: Optional[List[ProducerSlot]] = None
 
 
 @dataclass
@@ -133,8 +141,9 @@ class Simulation:
                 name="Nereus",
                 role="producer",
                 location="Baelo",
-                inventory=Inventory(fish=5, salt=2, empty_amphorae=1),
+                inventory=Inventory(fish=10, salt=4, empty_amphorae=2),
                 production_mode="standard",
+                producer_slots=[ProducerSlot(), ProducerSlot()],
             ),
             Player(
                 name="Cassia",
@@ -212,30 +221,35 @@ class Simulation:
             if player.role != "producer":
                 continue
 
-            if player.production_progress == 0:
-                player.production_mode = self.choose_production_mode(player)
-                needed_fish, needed_salt, duration = self.recipe_for_mode(player.production_mode)
-                if player.inventory.fish >= needed_fish and player.inventory.salt >= needed_salt and player.inventory.empty_amphorae >= 1:
-                    player.inventory.fish -= needed_fish
-                    player.inventory.salt -= needed_salt
-                    player.inventory.empty_amphorae -= 1
-                    player.production_progress = 1
-                    if verbose:
-                        print(f"{player.name} starts {player.production_mode} garum production")
-                continue
+            slots = player.producer_slots or [ProducerSlot(mode=player.production_mode, progress=player.production_progress)]
+            for index, slot in enumerate(slots, start=1):
+                if slot.progress == 0:
+                    slot.mode = self.choose_production_mode(player)
+                    needed_fish, needed_salt, duration = self.recipe_for_mode(slot.mode)
+                    if player.inventory.fish >= needed_fish and player.inventory.salt >= needed_salt and player.inventory.empty_amphorae >= 1:
+                        player.inventory.fish -= needed_fish
+                        player.inventory.salt -= needed_salt
+                        player.inventory.empty_amphorae -= 1
+                        slot.progress = 1
+                        if verbose:
+                            print(f"{player.name} starts {slot.mode} garum production in slot {index}")
+                    continue
 
-            _, _, duration = self.recipe_for_mode(player.production_mode)
-            player.production_progress += 1
-            if player.production_progress >= duration:
-                if player.production_mode == "standard":
-                    player.inventory.standard_garum += 1
-                    self.total_standard_completed += 1
-                else:
-                    player.inventory.premium_garum += 1
-                    self.total_premium_completed += 1
-                player.production_progress = 0
-                if verbose:
-                    print(f"{player.name} completes 1 amphora of {player.production_mode} garum")
+                _, _, duration = self.recipe_for_mode(slot.mode)
+                slot.progress += 1
+                if slot.progress >= duration:
+                    if slot.mode == "standard":
+                        player.inventory.standard_garum += 1
+                        self.total_standard_completed += 1
+                    else:
+                        player.inventory.premium_garum += 1
+                        self.total_premium_completed += 1
+                    slot.progress = 0
+                    player.inventory.empty_amphorae += 1
+                    if verbose:
+                        print(f"{player.name} completes 1 amphora of {slot.mode} garum in slot {index}")
+
+            player.producer_slots = slots
 
     def choose_production_mode(self, player: Player) -> str:
         if self.producer_mode == "standard":
@@ -245,7 +259,7 @@ class Simulation:
 
         producer_market = self.markets[player.location]
         standard_revenue = producer_market.standard_price() * WHOLESALE_DISCOUNT
-        premium_revenue = producer_market.premium_price() * WHOLESALE_DISCOUNT
+        premium_revenue = producer_market.premium_price() * PREMIUM_WHOLESALE_DISCOUNT
         standard_input_cost = STANDARD_RECIPE_FISH * FISH_PRICE + STANDARD_RECIPE_SALT * SALT_PRICE
         premium_input_cost = PREMIUM_RECIPE_FISH * FISH_PRICE + PREMIUM_RECIPE_SALT * SALT_PRICE
         standard_profit_per_tick = (standard_revenue - standard_input_cost) / STANDARD_PRODUCTION_TICKS
@@ -285,7 +299,7 @@ class Simulation:
 
         if producer.inventory.premium_garum > 0:
             retail_price = producer_market.premium_price()
-            wholesale_price = round(retail_price * WHOLESALE_DISCOUNT, 2)
+            wholesale_price = round(retail_price * PREMIUM_WHOLESALE_DISCOUNT, 2)
             quantity = producer.inventory.premium_garum
             affordable = min(quantity, int(merchant.inventory.gold // wholesale_price)) if wholesale_price > 0 else quantity
             if affordable > 0:
@@ -305,9 +319,11 @@ class Simulation:
             random_demand = max(0, int(round(self.rng.gauss(market.standard_demand, 1.0))))
             quantity = min(merchant.merchant_stock_standard, random_demand)
             sale_price = round(market.standard_price() * (1.0 + MERCHANT_MARKUP), 2)
+            transport_cost = quantity * 1.5
+            spoilage_cost = max(0, merchant.merchant_stock_standard - quantity) * 0.5
             revenue = quantity * sale_price
             merchant.merchant_stock_standard -= quantity
-            merchant.inventory.gold += revenue
+            merchant.inventory.gold += revenue - transport_cost - spoilage_cost
             market.standard_supply_sold_last_tick += quantity
             self.total_standard_sold += quantity
             if verbose:
@@ -317,9 +333,11 @@ class Simulation:
             random_demand = max(0, int(round(self.rng.gauss(market.premium_demand, 1.0))))
             quantity = min(merchant.merchant_stock_premium, random_demand)
             sale_price = round(market.premium_price() * (1.0 + MERCHANT_MARKUP), 2)
+            transport_cost = quantity * 3.0
+            spoilage_cost = max(0, merchant.merchant_stock_premium - quantity) * 1.5
             revenue = quantity * sale_price
             merchant.merchant_stock_premium -= quantity
-            merchant.inventory.gold += revenue
+            merchant.inventory.gold += revenue - transport_cost - spoilage_cost
             market.premium_supply_sold_last_tick += quantity
             self.total_premium_sold += quantity
             if verbose:
@@ -371,8 +389,13 @@ class Simulation:
             print(
                 f"{player.name:7s} {player.role:10s} gold={inv.gold:7.2f} fish={inv.fish:2d} salt={inv.salt:2d} "
                 f"empty_amp={inv.empty_amphorae:2d} std={inv.standard_garum:2d} prem={inv.premium_garum:2d} "
-                f"boats={inv.boats:2d} pans={inv.pans:2d} prog={player.production_progress}"
+                f"boats={inv.boats:2d} pans={inv.pans:2d} prog={self.format_progress(player)}"
             )
+
+    def format_progress(self, player: Player) -> str:
+        if player.producer_slots:
+            return "/".join(str(slot.progress) for slot in player.producer_slots)
+        return str(player.production_progress)
 
     def get_role_player(self, role: str) -> Player:
         for player in self.players:

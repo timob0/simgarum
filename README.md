@@ -31,22 +31,23 @@ This first version implements:
 
 - Standard garum: 10.0 gold
 - Premium garum: 22.0 gold
-- Merchant resale markup: 20%
-- Merchant wholesale discount from venue price: 18%
+- Merchant resale markup: 25%
+- Merchant wholesale discount from venue price: 12% for standard, 6% for premium
 
 ## Production rules per tick
 
 - Fisherman: 5 fish per boat
 - Salt-maker: 10 salt per pan
 - Producer:
+  - starts with 2 production slots
   - standard garum takes 3 ticks and consumes 5 fish + 2 salt per amphora
-  - premium garum takes 6 ticks and consumes 5 fish + 2 salt per amphora
+  - premium garum takes 6 ticks and consumes 4 fish + 2 salt per amphora
 
 ## Starting inventories
 
 - Fisherman: 1 boat
 - Salt-maker: 1 pan
-- Producer: 1 empty amphora, 5 fish, 2 salt
+- Producer: 2 empty amphorae, 10 fish, 4 salt
 - Merchant: 20 gold
 
 ## Running
