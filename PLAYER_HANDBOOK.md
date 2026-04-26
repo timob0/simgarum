@@ -245,6 +245,8 @@ The thresholds are higher than the purchase prices because each role is expected
 
 ### Current Prototype Notes
 
+> **Implementation status note:** Everything in Sections 2 to 4 is intended to describe the current prototype model as closely as possible. From this point onward, some handbook material describes the broader intended game rather than mechanics already implemented in the simulator. Those future-facing sections are marked explicitly below.
+
 The current Python prototype is not yet a full empire-scale grand simulation. It is a focused economic model designed to answer a smaller question first:
 
 > Can fishers, salt-makers, producers, and merchants all occupy useful and distinct roles in a shared garum economy?
@@ -271,6 +273,12 @@ Features that may still evolve later include:
 The handbook sections below describe the broader intended direction of the game, but the sections above reflect the **current working prototype** most closely.
 
 
+> **Status: partially implemented / partially planned**
+>
+> The simulator already implements fermentation time, quality emergence, local standard sales, premium export logic, merchant shipping, expansion, reputation, and spoilage.
+>
+> The simulator does **not** yet implement all of the detailed production ratios, public venue interactions, contract trading, packaging steps, or location-by-location facility specializations described below.
+
 ### Production
 
 - **Combine fish and salt** in your production facility to create garum.
@@ -289,6 +297,8 @@ The handbook sections below describe the broader intended direction of the game,
 - **Multiple facilities**: Each production facility processes one batch at a time. Own more facilities for more parallel batches.
 - Quality depends on **location conditions** and **facility level** (see Upgrades below).
 
+> **Not yet implemented as a separate step in the simulator.** In the current prototype, amphorae are free and effectively unlimited, and packaging is not modeled as its own time-consuming action.
+
 ### Packaging
 
 - **Convert garum into amphorae** for transport and sale.
@@ -296,12 +306,16 @@ The handbook sections below describe the broader intended direction of the game,
 - Amphorae are consumed in the process.
 - Packaging takes **1 tick** and can be done at any production facility or at a public trading venue.
 
+> **Partially implemented.** Shipping time, ship occupancy, route distance, perishability in transit, and merchant ship expansion exist in the simulator. Fixed named route tables and a broader multi-location network as described below are still planned rather than fully implemented.
+
 ### Shipping
 
 - **Dispatch ships** between locations with cargo.
 - Ships carry amphorae of garum, raw materials, or other goods.
 - Ships are busy during transit — they cannot accept new orders.
 - You can dispatch multiple ships simultaneously on different routes.
+
+> **Partially implemented.** The simulator models market sales and merchant purchasing behavior, but it does not yet expose full player-to-player trading flows or live venue negotiation in the richer sense described below.
 
 ### Trading
 
@@ -311,6 +325,8 @@ The handbook sections below describe the broader intended direction of the game,
   - Contracts specify quantity, location, delivery date, and price.
   - **Non-fulfillment penalty**: Lose 20% of contract value in gold + lose reputation points.
   - **Fulfillment bonus**: Earn extra gold and gain reputation.
+
+> **Described differently than the current prototype.** The simulator currently models expansion by buying more boats, pans, production slots, and merchant ships. It does **not** yet implement facility upgrade levels such as production tier upgrades or shipyard upgrades.
 
 ### Upgrading Facilities
 
@@ -336,6 +352,8 @@ Every facility — fishing grounds, salt pans, production facilities, shipyards 
 
 **All occupations benefit equally** from upgrades. A Fisherman who buys a production facility upgrades it the same way as a Garum Producer.
 
+> **Planned, not yet implemented in this full form.** The current simulator uses market logic and demand channels, but not fully interactive public trading venues with explicit player-visible order interaction.
+
 ### Public Trading Venues
 
 Warehouses are **public infrastructure** — they are not owned by any player. Each location has a trading venue where:
@@ -346,6 +364,8 @@ Warehouses are **public infrastructure** — they are not owned by any player. E
 - **Price discovery** happens organically: when many players sell garum at Ostia, the price drops. When supply is low, prices rise.
 
 No player can control or monopolize a trading venue. The market is open to all.
+
+> **Not yet implemented.** Future contracts, deposits, penalties, secondary contract trading, and delivery obligations are still design material rather than active simulator mechanics.
 
 ### Contracts
 
@@ -361,6 +381,10 @@ Contracts can be **traded between players** — if you can't fulfill, you can se
 ---
 
 ## 6. Reputation
+
+> **Partially implemented, but differently from the older text below.**
+>
+> The current simulator uses a continuous numerical reputation model for both producers and merchants rather than the handbook's older 1-to-10 prestige ladder. Reputation is currently driven mainly by quality consistency and sale execution, especially for premium access. The rank names and unlock bands below should therefore be read as future-facing flavor design, not as an exact description of the current code.
 
 Reputation is a simple scale from **1 to 10** that affects your business:
 
@@ -384,6 +408,8 @@ Reputation decreases by:
 ---
 
 ## 7. Bankruptcy and End Game
+
+> **Mostly planned, not yet implemented in full.** The current simulator is still a balancing model. It tracks gold, expansion, production, shipping, spoilage, and sales, but it does not yet implement the full bankruptcy, liquidation, round-ending, or winner-determination rules described below.
 
 ### Bankruptcy
 
@@ -410,6 +436,8 @@ If players exit early, they are considered bankrupt for scoring purposes. The la
 ---
 
 ## 8. The User Interface
+
+> **Not implemented in the current simulator.** The Python prototype is currently a command-line simulation and balancing model, not a completed interactive map UI or terminal game surface. The interface material below describes a likely future presentation layer rather than current functionality.
 
 ### The Map
 
@@ -463,6 +491,8 @@ From any screen, you can enter commands:
 
 ## 9. Random Events
 
+> **Not yet implemented.** Storms, war, piracy, decrees, and similar systemic random events are still part of the broader design vision rather than active simulator logic.
+
 The world is not static. Each tick, there is a chance of random events:
 
 | Event | Effect |
@@ -480,6 +510,8 @@ Events affect the entire world, not just individual players.
 ---
 
 ## 10. The Economic Cycle
+
+> **Partially conceptual.** The simulator does model growth, expansion, risk, spoilage, and differentiated value channels, but it does not yet implement the full long-era macroeconomic arc described below.
 
 ### The Rise and Fall of Garum
 
