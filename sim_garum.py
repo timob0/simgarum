@@ -10,8 +10,9 @@ from typing import Dict, List, Optional
 FISH_PRICE = 1.0
 SALT_PRICE = 0.5
 STANDARD_GARUM_PRICE = 10.0
-PREMIUM_GARUM_PRICE = 20.0
-MERCHANT_MARKUP = 0.15
+PREMIUM_GARUM_PRICE = 22.0
+MERCHANT_MARKUP = 0.20
+WHOLESALE_DISCOUNT = 0.82
 
 STANDARD_RECIPE_FISH = 5
 STANDARD_RECIPE_SALT = 2
@@ -73,6 +74,9 @@ class GarumMarket:
 
 
 class WorldMarket:
+    def __init__(self, rng: random.Random) -> None:
+        self.rng = rng
+
     def buy_fish(self, buyer: Player, quantity: int) -> int:
         affordable = min(quantity, int(buyer.inventory.gold // FISH_PRICE))
         cost = affordable * FISH_PRICE
@@ -91,14 +95,16 @@ class WorldMarket:
         buyer.inventory.empty_amphorae += quantity
 
     def sell_fish(self, seller: Player, quantity: int) -> float:
-        quantity = min(quantity, seller.inventory.fish)
+        demand = max(0, int(round(self.rng.gauss(4.0, 1.5))))
+        quantity = min(quantity, seller.inventory.fish, demand)
         revenue = quantity * FISH_PRICE
         seller.inventory.fish -= quantity
         seller.inventory.gold += revenue
         return revenue
 
     def sell_salt(self, seller: Player, quantity: int) -> float:
-        quantity = min(quantity, seller.inventory.salt)
+        demand = max(0, int(round(self.rng.gauss(8.0, 2.0))))
+        quantity = min(quantity, seller.inventory.salt, demand)
         revenue = quantity * SALT_PRICE
         seller.inventory.salt -= quantity
         seller.inventory.gold += revenue
@@ -109,7 +115,7 @@ class Simulation:
     def __init__(self, seed: Optional[int] = None, producer_mode: str = "weighted") -> None:
         self.rng = random.Random(seed)
         self.producer_mode = producer_mode
-        self.world_market = WorldMarket()
+        self.world_market = WorldMarket(self.rng)
         self.players: List[Player] = [
             Player(
                 name="Gaius",
@@ -238,8 +244,8 @@ class Simulation:
             return "premium"
 
         producer_market = self.markets[player.location]
-        standard_revenue = producer_market.standard_price()
-        premium_revenue = producer_market.premium_price()
+        standard_revenue = producer_market.standard_price() * WHOLESALE_DISCOUNT
+        premium_revenue = producer_market.premium_price() * WHOLESALE_DISCOUNT
         standard_input_cost = STANDARD_RECIPE_FISH * FISH_PRICE + STANDARD_RECIPE_SALT * SALT_PRICE
         premium_input_cost = PREMIUM_RECIPE_FISH * FISH_PRICE + PREMIUM_RECIPE_SALT * SALT_PRICE
         standard_profit_per_tick = (standard_revenue - standard_input_cost) / STANDARD_PRODUCTION_TICKS
@@ -247,11 +253,11 @@ class Simulation:
 
         if player.inventory.gold < premium_input_cost and player.inventory.gold >= standard_input_cost:
             return "standard"
-        if premium_profit_per_tick > standard_profit_per_tick * 1.10:
+        if premium_profit_per_tick > standard_profit_per_tick * 1.20:
             return "premium"
-        if standard_profit_per_tick > premium_profit_per_tick * 1.10:
+        if standard_profit_per_tick > premium_profit_per_tick * 1.20:
             return "standard"
-        return self.rng.choice(["standard", "premium"])
+        return self.rng.choices(["standard", "premium"], weights=[3, 2], k=1)[0]
 
     def recipe_for_mode(self, mode: str) -> tuple[int, int, int]:
         if mode == "premium":
@@ -264,12 +270,12 @@ class Simulation:
         producer_market = self.markets[producer.location]
 
         if producer.inventory.standard_garum > 0:
-            price = producer_market.standard_price()
+            retail_price = producer_market.standard_price()
+            wholesale_price = round(retail_price * WHOLESALE_DISCOUNT, 2)
             quantity = producer.inventory.standard_garum
-            total = quantity * price
-            affordable = min(quantity, int(merchant.inventory.gold // price)) if price > 0 else quantity
+            affordable = min(quantity, int(merchant.inventory.gold // wholesale_price)) if wholesale_price > 0 else quantity
             if affordable > 0:
-                total = affordable * price
+                total = affordable * wholesale_price
                 producer.inventory.standard_garum -= affordable
                 producer.inventory.gold += total
                 merchant.inventory.gold -= total
@@ -278,11 +284,12 @@ class Simulation:
                     print(f"{merchant.name} buys {affordable} standard garum from {producer.name} for {total:.2f} gold")
 
         if producer.inventory.premium_garum > 0:
-            price = producer_market.premium_price()
+            retail_price = producer_market.premium_price()
+            wholesale_price = round(retail_price * WHOLESALE_DISCOUNT, 2)
             quantity = producer.inventory.premium_garum
-            affordable = min(quantity, int(merchant.inventory.gold // price)) if price > 0 else quantity
+            affordable = min(quantity, int(merchant.inventory.gold // wholesale_price)) if wholesale_price > 0 else quantity
             if affordable > 0:
-                total = affordable * price
+                total = affordable * wholesale_price
                 producer.inventory.premium_garum -= affordable
                 producer.inventory.gold += total
                 merchant.inventory.gold -= total

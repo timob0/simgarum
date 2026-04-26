@@ -8,6 +8,7 @@ This first version implements:
 
 - fixed anchor prices for raw materials
 - effectively unlimited market supply for fish, salt, and amphoras
+- anchored raw-material prices with softer external demand caps for raw-material sellers
 - player trading via market venues only
 - deterministic per-round production by occupation
 - dynamic market demand and pricing for garum only
@@ -29,8 +30,9 @@ This first version implements:
 ## Garum base values
 
 - Standard garum: 10.0 gold
-- Premium garum: 20.0 gold
-- Merchant resale markup: 15%
+- Premium garum: 22.0 gold
+- Merchant resale markup: 20%
+- Merchant wholesale discount from venue price: 18%
 
 ## Production rules per tick
 
