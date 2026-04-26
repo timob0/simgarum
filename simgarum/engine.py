@@ -216,6 +216,8 @@ class Simulation:
                 location="Baelo",
                 inventory=Inventory(gold=30.0, fish=10, salt=4, empty_amphorae=2),
                 producer_slots=[ProducerSlot(), ProducerSlot()],
+                fish_stock=[FishUnit() for _ in range(10)],
+                salt_stock=[SaltUnit() for _ in range(4)],
             ),
             Player(
                 name="Cassia",
@@ -353,6 +355,7 @@ class Simulation:
         producer = self.get_role_player("producer")
         merchant = self.get_role_player("merchant")
         self.age_fish_stock(fisherman, verbose)
+        self.age_fish_stock(producer, verbose)
         self.age_salt_stock(salt_maker, verbose)
         self.age_salt_stock(producer, verbose)
         producer.producer_batches = self.age_batches(producer.producer_batches, verbose, producer.name)
