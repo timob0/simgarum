@@ -209,26 +209,34 @@ class Simulation:
         self.total_premium_sold = 0
         self.total_standard_sold_local = 0
         self.total_batches_perished = 0
+        self.recent_events: List[str] = []
+
+    def log_event(self, message: str, verbose: bool = False) -> None:
+        self.recent_events.append(message)
+        self.recent_events = self.recent_events[-40:]
+        if verbose:
+            print(message)
 
     def step(self, tick: int, verbose: bool = True) -> None:
-            for market in self.markets.values():
-                market.reset_tick_sales()
+        self.recent_events = []
+        for market in self.markets.values():
+            market.reset_tick_sales()
 
-            self.age_inventory(verbose)
-            self.produce_resources(verbose)
-            self.producers_restock_inputs(verbose)
-            self.advance_garum_production(verbose)
-            self.sell_local_standard_garum(verbose)
-            self.merchants_buy_garum(verbose)
-            self.advance_shipments(verbose)
-            self.sell_surplus_raw_materials(verbose)
-            self.merchants_invest(verbose)
-            self.producers_invest(verbose)
-            self.raw_producers_invest(verbose)
+        self.age_inventory(verbose)
+        self.produce_resources(verbose)
+        self.producers_restock_inputs(verbose)
+        self.advance_garum_production(verbose)
+        self.sell_local_standard_garum(verbose)
+        self.merchants_buy_garum(verbose)
+        self.advance_shipments(verbose)
+        self.sell_surplus_raw_materials(verbose)
+        self.merchants_invest(verbose)
+        self.producers_invest(verbose)
+        self.raw_producers_invest(verbose)
 
-            if verbose:
-                self.print_market_snapshot()
-                self.print_player_snapshot()
+        if verbose:
+            self.print_market_snapshot()
+            self.print_player_snapshot()
 
     def run(self, ticks: int = 12, verbose: bool = True) -> Dict[str, object]:
         for tick in range(1, ticks + 1):
@@ -258,8 +266,7 @@ class Simulation:
             perish_age = GARUM_PERISH_PREMIUM_AGE if batch.quality_label == "premium" else GARUM_PERISH_STANDARD_AGE
             if batch.age >= perish_age:
                 self.total_batches_perished += 1
-                if verbose:
-                    print(f"{owner_name} loses a {batch.quality_label} garum batch to spoilage")
+                self.log_event(f"{owner_name} loses a {batch.quality_label} garum batch to spoilage", verbose)
                 continue
             remaining.append(batch)
         return remaining
@@ -269,13 +276,11 @@ class Simulation:
             if player.role == "fisherman":
                 produced = 5 * player.inventory.boats
                 player.inventory.fish += produced
-                if verbose:
-                    print(f"{player.name} catches {produced} fish")
+                self.log_event(f"{player.name} catches {produced} fish", verbose)
             elif player.role == "salt-maker":
                 produced = 10 * player.inventory.pans
                 player.inventory.salt += produced
-                if verbose:
-                    print(f"{player.name} harvests {produced} salt")
+                self.log_event(f"{player.name} harvests {produced} salt", verbose)
 
     def producers_restock_inputs(self, verbose: bool) -> None:
         for player in self.players:
@@ -288,12 +293,12 @@ class Simulation:
             min_salt = 2 * max(1, len(player.producer_slots or []))
             if player.inventory.fish < min_fish:
                 bought = self.world_market.buy_fish(player, min_fish - player.inventory.fish)
-                if verbose and bought > 0:
-                    print(f"{player.name} buys {bought} fish for {bought * FISH_PRICE:.2f} gold")
+                if bought > 0:
+                    self.log_event(f"{player.name} buys {bought} fish for {bought * FISH_PRICE:.2f} gold", verbose)
             if player.inventory.salt < min_salt:
                 bought = self.world_market.buy_salt(player, min_salt - player.inventory.salt)
-                if verbose and bought > 0:
-                    print(f"{player.name} buys {bought} salt for {bought * SALT_PRICE:.2f} gold")
+                if bought > 0:
+                    self.log_event(f"{player.name} buys {bought} salt for {bought * SALT_PRICE:.2f} gold", verbose)
 
     def advance_garum_production(self, verbose: bool) -> None:
         for player in self.players:
@@ -312,8 +317,7 @@ class Simulation:
                         player.inventory.salt -= needed_salt
                         player.inventory.empty_amphorae -= 1
                         slot.progress = 1
-                        if verbose:
-                            print(f"{player.name} starts {slot.mode} garum production in slot {index}")
+                        self.log_event(f"{player.name} starts {slot.mode} garum production in slot {index}", verbose)
                     continue
 
                 slot.progress += 1
@@ -328,8 +332,7 @@ class Simulation:
                     slot.progress = 0
                     slot.target_duration = 0
                     player.inventory.empty_amphorae += 1
-                    if verbose:
-                        print(f"{player.name} completes 1 batch of {batch.quality_label} garum in slot {index} (quality {batch.quality_score:.1f})")
+                    self.log_event(f"{player.name} completes 1 batch of {batch.quality_label} garum in slot {index} (quality {batch.quality_score:.1f})", verbose)
 
             player.producer_slots = slots
 
@@ -441,8 +444,7 @@ class Simulation:
         local_market.standard_supply_sold_last_tick += quantity
         self.total_standard_sold += quantity
         self.total_standard_sold_local += quantity
-        if verbose:
-            print(f"{producer.name} sells {quantity} standard garum locally in {producer.location} for {revenue:.2f} gold")
+        self.log_event(f"{producer.name} sells {quantity} standard garum locally in {producer.location} for {revenue:.2f} gold", verbose)
 
     def estimated_premium_sell_capacity(self, merchant: Player) -> int:
         total = 0
@@ -484,8 +486,7 @@ class Simulation:
                 merchant.inventory.gold -= total
                 merchant.shipments.append(Shipment(batch=batch, ticks_remaining=distance + 1, destination=destination, transport_cost_paid=transport_cost))
                 shipment_slots_left -= 1
-                if verbose:
-                    print(f"{merchant.name} buys 1 standard garum batch from {producer.name} for {wholesale_price:.2f} gold")
+                self.log_event(f"{merchant.name} buys 1 standard garum batch from {producer.name} for {wholesale_price:.2f} gold", verbose)
 
         if premium_batches and shipment_slots_left > 0 and premium_sell_capacity > 0:
             retail_price = producer_market.premium_price()
@@ -505,8 +506,7 @@ class Simulation:
                 merchant.inventory.gold -= total
                 merchant.shipments.append(Shipment(batch=batch, ticks_remaining=distance + 2, destination=destination, transport_cost_paid=transport_cost))
                 shipment_slots_left -= 1
-                if verbose:
-                    print(f"{merchant.name} buys 1 premium garum batch from {producer.name} for {wholesale_price:.2f} gold")
+                self.log_event(f"{merchant.name} buys 1 premium garum batch from {producer.name} for {wholesale_price:.2f} gold", verbose)
 
     def choose_market_destination(self, quality: str) -> str:
         candidates = [market for market in self.markets.values() if market.location != "Baelo"]
@@ -525,8 +525,7 @@ class Simulation:
             perish_age = GARUM_PERISH_PREMIUM_AGE if shipment.batch.quality_label == "premium" else GARUM_PERISH_STANDARD_AGE
             if shipment.batch.age >= perish_age:
                 self.total_batches_perished += 1
-                if verbose:
-                    print(f"{merchant.name} loses a {shipment.batch.quality_label} shipment to spoilage")
+                self.log_event(f"{merchant.name} loses a {shipment.batch.quality_label} shipment to spoilage", verbose)
                 continue
             if shipment.ticks_remaining > 0:
                 remaining.append(shipment)
@@ -543,8 +542,7 @@ class Simulation:
                 market.standard_supply_sold_last_tick += quantity_sold
                 self.total_standard_sold += quantity_sold
                 self.update_merchant_reputation(merchant, shipment.batch, sold_as_premium=False)
-                if verbose:
-                    print(f"{merchant.name} receives and sells {quantity_sold}/1 standard garum in {shipment.destination} for {revenue:.2f} gold")
+                self.log_event(f"{merchant.name} receives and sells {quantity_sold}/1 standard garum in {shipment.destination} for {revenue:.2f} gold", verbose)
             else:
                 can_sell_premium = (
                     merchant.merchant_reputation >= market.premium_reputation_requirement
@@ -564,8 +562,7 @@ class Simulation:
                     market.premium_supply_sold_last_tick += quantity_sold
                     self.total_premium_sold += quantity_sold
                     self.update_merchant_reputation(merchant, shipment.batch, sold_as_premium=True)
-                    if verbose:
-                        print(f"{merchant.name} receives and sells {quantity_sold}/1 premium garum in {shipment.destination} for {revenue:.2f} gold")
+                    self.log_event(f"{merchant.name} receives and sells {quantity_sold}/1 premium garum in {shipment.destination} for {revenue:.2f} gold", verbose)
                 elif can_trial_premium:
                     demand = max(0, int(round(self.rng.gauss(market.premium_demand * 0.6, 0.8))))
                     quantity_sold = 1 if demand > 0 else 0
@@ -576,8 +573,7 @@ class Simulation:
                     market.premium_supply_sold_last_tick += quantity_sold
                     self.total_premium_sold += quantity_sold
                     self.update_merchant_reputation(merchant, shipment.batch, sold_as_premium=True)
-                    if verbose:
-                        print(f"{merchant.name} trial-sells {quantity_sold}/1 premium garum in {shipment.destination} for {revenue:.2f} gold")
+                    self.log_event(f"{merchant.name} trial-sells {quantity_sold}/1 premium garum in {shipment.destination} for {revenue:.2f} gold", verbose)
                 else:
                     downgraded_price = round(market.standard_price() * 0.95, 2)
                     demand = max(0, int(round(self.rng.gauss(market.standard_demand, 0.8))))
@@ -588,8 +584,7 @@ class Simulation:
                     market.standard_supply_sold_last_tick += quantity_sold
                     self.total_standard_sold += quantity_sold
                     self.update_merchant_reputation(merchant, shipment.batch, sold_as_premium=False)
-                    if verbose:
-                        print(f"{merchant.name} downgrades and sells {quantity_sold}/1 premium-grade garum as standard in {shipment.destination} for {revenue:.2f} gold")
+                    self.log_event(f"{merchant.name} downgrades and sells {quantity_sold}/1 premium-grade garum as standard in {shipment.destination} for {revenue:.2f} gold", verbose)
 
         merchant.shipments = remaining
 
@@ -600,14 +595,12 @@ class Simulation:
         if fisherman.inventory.fish > 0:
             sold = fisherman.inventory.fish
             revenue = self.world_market.sell_fish(fisherman, sold)
-            if verbose:
-                print(f"{fisherman.name} sells raw fish for {revenue:.2f} gold")
+            self.log_event(f"{fisherman.name} sells raw fish for {revenue:.2f} gold", verbose)
 
         if salt_maker.inventory.salt > 0:
             sold = salt_maker.inventory.salt
             revenue = self.world_market.sell_salt(salt_maker, sold)
-            if verbose:
-                print(f"{salt_maker.name} sells raw salt for {revenue:.2f} gold")
+            self.log_event(f"{salt_maker.name} sells raw salt for {revenue:.2f} gold", verbose)
 
     def raw_producers_invest(self, verbose: bool) -> None:
         fisherman = self.get_role_player("fisherman")
@@ -616,14 +609,12 @@ class Simulation:
         if fisherman.inventory.gold >= BOAT_COST + 60:
             fisherman.inventory.gold -= BOAT_COST
             fisherman.inventory.boats += 1
-            if verbose:
-                print(f"{fisherman.name} buys a new boat")
+            self.log_event(f"{fisherman.name} buys a new boat", verbose)
 
         if salt_maker.inventory.gold >= PAN_COST + 60:
             salt_maker.inventory.gold -= PAN_COST
             salt_maker.inventory.pans += 1
-            if verbose:
-                print(f"{salt_maker.name} expands with a new salt pan")
+            self.log_event(f"{salt_maker.name} expands with a new salt pan", verbose)
 
     def producers_invest(self, verbose: bool) -> None:
         producer = self.get_role_player("producer")
@@ -632,8 +623,7 @@ class Simulation:
             producer.producer_slots = producer.producer_slots or []
             producer.producer_slots.append(ProducerSlot())
             producer.inventory.empty_amphorae += 1
-            if verbose:
-                print(f"{producer.name} adds a new production slot")
+            self.log_event(f"{producer.name} adds a new production slot", verbose)
 
     def merchants_invest(self, verbose: bool) -> None:
         merchant = self.get_role_player("merchant")
@@ -641,8 +631,7 @@ class Simulation:
         if merchant.inventory.gold >= MERCHANT_SHIP_COST + 120 and in_transit >= merchant.merchant_ships:
             merchant.inventory.gold -= MERCHANT_SHIP_COST
             merchant.merchant_ships += 1
-            if verbose:
-                print(f"{merchant.name} buys a new merchant ship")
+            self.log_event(f"{merchant.name} buys a new merchant ship", verbose)
 
     def snapshot(self, ticks: int) -> Dict[str, object]:
         role_gold = {player.role: round(player.inventory.gold, 2) for player in self.players}

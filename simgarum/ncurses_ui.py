@@ -48,6 +48,8 @@ def render(stdscr, sim: Simulation, role: str, tick: int, paused: bool, tick_sec
         f"Tick: {tick}    Role: {role}    Tick delay: {tick_seconds:.2f}s    {'PAUSED' if paused else 'RUNNING'}",
         "",
         f"You: gold={player.inventory.gold:.2f} fish={player.inventory.fish} salt={player.inventory.salt} boats={player.inventory.boats} pans={player.inventory.pans}",
+        f"Fisherman: gold={sim.get_role_player('fisherman').inventory.gold:.2f} fish={sim.get_role_player('fisherman').inventory.fish} boats={sim.get_role_player('fisherman').inventory.boats}",
+        f"Salt-maker: gold={sim.get_role_player('salt-maker').inventory.gold:.2f} salt={sim.get_role_player('salt-maker').inventory.salt} pans={sim.get_role_player('salt-maker').inventory.pans}",
         f"Producer rep={producer.producer_reputation:.1f} batches={len(producer.producer_batches)} slots={len(producer.producer_slots or [])}",
         f"Merchant rep={merchant.merchant_reputation:.1f} ships={merchant.merchant_ships} in_transit={len(merchant.shipments)}",
         "",
@@ -58,6 +60,11 @@ def render(stdscr, sim: Simulation, role: str, tick: int, paused: bool, tick_sec
             f"- {market.location}: std={market.standard_price():.2f} prem={market.premium_price():.2f} std_dem={market.standard_demand:.1f} prem_dem={market.premium_demand:.1f}"
         )
 
+    lines += [
+        "",
+        "Recent tick events:",
+    ]
+    lines.extend([f"  - {event}" for event in sim.recent_events[-10:]])
     lines += [
         "",
         "Controls:",
